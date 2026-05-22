@@ -8,7 +8,7 @@ boundaries. Thi is the contract layer for the entire pipeline.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel, Field, model_validator
 
 # ─────────────────────────────────────────────
@@ -107,26 +107,6 @@ class DecomposedQuery(BaseModel):
 # ─────────────────────────────────────────────
 # 2. Literature Scout → Output
 # ─────────────────────────────────────────────
-
-class PaperMetadata(BaseModel):
-    """
-    Single paper record returned by a Literature Scout.
-    """
-    paper_id: str = Field(..., description="PubMed PMID or CT.gov NCT ID.")
-    source: str = Field(..., description = "'pubmed' | 'ct_gov' | 'semantic_scholar'")
-    title: str
-    abstract: Optional[str] = None
-    authors: list[str] = Field(default_factory=list)
-    publication_year: Optional[int] = None
-    journal: Optional[str] = None
-    doi: Optional[str] = None
-    study_design: StudyDesign = StudyDesign.UNKNOWN
-    relevance_score: float = Field(
-        ...,
-        ge=0.0,
-        le=1.0,
-        description="Reranker score from MedCPT cross-encoder."
-    )
 
 class ScoutResult(BaseModel):
     """
@@ -302,6 +282,39 @@ class PipelineState(BaseModel):
     uncertainty_report: Optional[UncertaintyReport] = None
     pipeline_status: PipelineStatus = PipelineStatus.PROCEED
     iteration_count: int = 0
+
+class PaperSource(str, Enum):
+    PUBMED ="PUBMED"
+    CLINICALTRIALS_GOV = "CLINICALTRIALS_GOV"
+    SEMANTIC_SCHOLAR = "SEMANTIC_SCHOLAR"
+
+class PaperMetadata(BaseModel):
+    """
+    Unified shape returned bu every retrieval tool.
+    Literature Scout fans these in.
+    """
+    paper_id: str = Field(..., description="Source-prefixed ID, e.g. 'pubmed:12345678'")
+    source: PaperSource
+    title: str
+    abstract: Optional[str] = None
+    authors: list[str] = Field(default_factory=list)
+    publication_year: Optional[int] = None
+    journal: Optional[str] = None
+    doi: Optional[str] = None
+    url: Optional[str] = None
+    # Source-specific extras kept in a typed bag, not parsed yet — Evidence Extractor's job
+    raw_metadata: dict[str, Any] = Field(default_factory=dict)
+    
+    @model_validator(mode="after")
+    def _validate_id_prefix(self) -> "PaperMetadata":
+        expected = {
+            PaperSource.PUBMED: "pubmed:",
+            PaperSource.CLINICALTRIALS_GOV: "nct:",
+            PaperSource.SEMANTIC_SCHOLAR: "s2:",
+        }[self.source]
+        if not self.paper_id.startswith(expected):
+            raise ValueError(f"paper_id must start with '{expected}' for source {self.source}")
+        return self
     
     
     

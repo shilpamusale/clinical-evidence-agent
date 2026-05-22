@@ -20,6 +20,7 @@ from schemas.agent_io import(
     EvidenceGap,
     PipelineState,
     GRADEAssessment,
+    PaperSource
 )
 
 # Clinical Question 
@@ -100,8 +101,8 @@ def test_scout_result_relevance_score_bounds():
         )
 def test_scout_result_valid():
     paper = PaperMetadata(
-        paper_id="36507710",
-        source="pubmed",
+        paper_id="pubmed:36507710",
+        source=PaperSource.PUBMED,
         title="EMPEROR-Preserved: Empagliflozin in HFpEF",
         study_design=StudyDesign.RCT,
         relevance_score=0.92,
@@ -115,7 +116,8 @@ def test_scout_result_valid():
         total_retrieved=1,
         recall_at_10 = 0.0
     )
-    assert result.papers[0].paper_id == "36507710"
+    assert result.papers[0].paper_id == "pubmed:36507710"
+    assert paper.source == PaperSource.PUBMED
 
 
 # ── GRADEAssessment ──────────────────────────────────────────────────────────
